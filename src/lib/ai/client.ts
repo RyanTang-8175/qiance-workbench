@@ -17,9 +17,9 @@ export const MODEL_ROUTER: Record<string, AIConfig> = {
   long_report: { provider: "claude", model: "claude-sonnet-4-20250514", maxTokens: 8192 },
   chart_recognition: { provider: "claude", model: "claude-sonnet-4-20250514", maxTokens: 4096 },
   ai_self_chart: { provider: "claude", model: "claude-sonnet-4-20250514", maxTokens: 2048 },
-  wechat_reply: { provider: "deepseek", model: "deepseek-chat", maxTokens: 1024 },
-  followup_questions: { provider: "deepseek", model: "deepseek-chat", maxTokens: 1024 },
-  chart_comparison: { provider: "deepseek", model: "deepseek-chat", maxTokens: 1024 },
+  wechat_reply: { provider: "deepseek", model: "deepseek-v4-flash", maxTokens: 1024 },
+  followup_questions: { provider: "deepseek", model: "deepseek-v4-flash", maxTokens: 1024 },
+  chart_comparison: { provider: "deepseek", model: "deepseek-v4-flash", maxTokens: 1024 },
 };
 
 function resolveProvider(taskType: string, override?: AIProvider): AIProvider {
@@ -46,7 +46,7 @@ function getDeepSeekClient() {
   if (!key) throw new Error("DeepSeek API Key 未配置，请在设置页面填写");
   return {
     apiKey: key,
-    baseURL: "https://api.deepseek.com/v1",
+    baseURL: "https://api.deepseek.com",
   };
 }
 
@@ -73,7 +73,7 @@ export async function callAI(
 ): Promise<AIResponse> {
   const routerConfig = MODEL_ROUTER[taskType] ?? {
     provider: "deepseek" as AIProvider,
-    model: "deepseek-chat",
+    model: "deepseek-v4-flash",
     maxTokens: 2048,
   };
 
@@ -118,7 +118,19 @@ export async function callAI(
       }),
     });
 
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      let errMsg = `DeepSeek API 错误 (${response.status})`;
+      try {
+        const errData = JSON.parse(errText);
+        errMsg = errData.error?.message || errData.message || errMsg;
+      } catch {}
+      throw new Error(errMsg);
+    }
+
     const data = await response.json();
+    if (data.error) throw new Error(data.error.message || "DeepSeek 返回错误");
+
     return {
       content: data.choices?.[0]?.message?.content ?? "",
       model,
@@ -141,7 +153,7 @@ export async function callAIStream(
 ): Promise<AIResponse> {
   const routerConfig = MODEL_ROUTER[taskType] ?? {
     provider: "deepseek" as AIProvider,
-    model: "deepseek-chat",
+    model: "deepseek-v4-flash",
     maxTokens: 2048,
   };
 
@@ -194,6 +206,16 @@ export async function callAIStream(
         ],
       }),
     });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      let errMsg = `DeepSeek API 错误 (${response.status})`;
+      try {
+        const errData = JSON.parse(errText);
+        errMsg = errData.error?.message || errData.message || errMsg;
+      } catch {}
+      throw new Error(errMsg);
+    }
 
     let fullContent = "";
     const reader = response.body?.getReader();
