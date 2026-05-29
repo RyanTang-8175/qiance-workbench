@@ -37,6 +37,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [layout, setLayout] = useState<"traditional" | "modern">("traditional");
   const [activeTab, setActiveTab] = useState<TabKey>("chart");
   const [loading, setLoading] = useState(true);
+  const [tokenUsage, setTokenUsage] = useState<{ input: number; output: number; cost: string } | null>(null);
 
   // AI 相关状态
   const [aiLoading, setAiLoading] = useState(false);
@@ -140,6 +141,9 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     setAiLoading(true);
     setAiTask(taskType);
     setAiResult("");
+    setTokenUsage(null);
+    const startTime = Date.now();
+    let fullText = "";
 
     try {
       const res = await fetch("/api/ai", {
@@ -156,7 +160,6 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
-      let fullText = "";
 
       if (reader) {
         while (true) {
@@ -182,6 +185,17 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       setAiResult("生成失败，请检查 API Key 配置");
     } finally {
       setAiLoading(false);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      // 估算 token（中文约 1.5 token/字）
+      const outputTokens = Math.round(fullText.length * 1.5);
+      const inputTokens = Math.round(JSON.stringify(chart).length * 0.5);
+      // DeepSeek 约 $0.14/M input, $0.28/M output; Claude Sonnet 约 $3/M input, $15/M output
+      const costEstimate = (inputTokens * 0.14 + outputTokens * 0.28) / 1_000_000;
+      setTokenUsage({
+        input: inputTokens,
+        output: outputTokens,
+        cost: `~$${costEstimate.toFixed(4)} · ${elapsed}s`,
+      });
     }
   }
 
@@ -482,6 +496,19 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               {aiLoading && !aiResult && (
                 <div className="animate-pulse-slow" style={{ color: "var(--text-muted)" }}>
                   正在生成...
+                </div>
+              )}
+              {tokenUsage && (
+                <div className="flex items-center gap-4 text-xs mt-2 p-2 rounded" style={{ backgroundColor: "var(--bg-secondary)" }}>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    Input: ~{tokenUsage.input.toLocaleString()} tokens
+                  </span>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    Output: ~{tokenUsage.output.toLocaleString()} tokens
+                  </span>
+                  <span style={{ color: "var(--gold)" }}>
+                    {tokenUsage.cost}
+                  </span>
                 </div>
               )}
               {aiResult && (

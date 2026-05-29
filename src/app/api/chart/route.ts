@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateChart } from "@/lib/bazi/chart";
 import { generateZiWeiChart } from "@/lib/ziwei/chart";
-import { calculateTrueSolarTime, CITY_COORDINATES } from "@/lib/bazi/true-solar-time";
+import { calculateTrueSolarTime } from "@/lib/bazi/true-solar-time";
+import { LOCATION_DB } from "@/lib/bazi/locations";
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     // 真太阳时校正
     if (useTrueSolarTime && birthPlace) {
-      const coords = CITY_COORDINATES[birthPlace];
+      const coords = LOCATION_DB[birthPlace];
       if (coords) {
         trueSolarTimeResult = calculateTrueSolarTime(
           y, m, d, h, mi, coords.lng
