@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import BaziChart from "@/components/chart/BaziChart";
 import LuckCycles from "@/components/chart/LuckCycles";
 import ShenShaList from "@/components/chart/ShenSha";
 import BranchRelations from "@/components/chart/BranchRelations";
+import VerificationTable from "@/components/chart/VerificationTable";
 import type { ChartResult } from "@/lib/bazi/chart";
+import type { VerificationResult } from "@/lib/bazi/verification";
+import type { AISelfChartResult } from "@/lib/ai/chart-ai";
+import type { ChartOCRResult } from "@/lib/ai/chart-ocr";
 
 interface CaseData {
   id: string;
@@ -23,16 +27,28 @@ interface CaseData {
   created_at: string;
 }
 
+type TabKey = "chart" | "verify" | "analysis" | "ai";
+
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [chart, setChart] = useState<ChartResult | null>(null);
   const [layout, setLayout] = useState<"traditional" | "modern">("traditional");
-  const [activeTab, setActiveTab] = useState<"chart" | "analysis" | "ai">("chart");
+  const [activeTab, setActiveTab] = useState<TabKey>("chart");
   const [loading, setLoading] = useState(true);
+
+  // AI 相关状态
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
   const [aiTask, setAiTask] = useState<string | null>(null);
+
+  // 三盘校验相关状态
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
+  const [aiChartResult, setAiChartResult] = useState<AISelfChartResult | null>(null);
+  const [imageChartResult, setImageChartResult] = useState<ChartOCRResult | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadCase();
@@ -55,6 +71,69 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  // 三盘校验
+  async function handleVerify() {
+    if (!chart) return;
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    setAiChartResult(null);
+
+    try {
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year: new Date(caseData!.birth_solar).getFullYear(),
+          month: new Date(caseData!.birth_solar).getMonth() + 1,
+          day: new Date(caseData!.birth_solar).getDate(),
+          hour: parseInt(caseData!.birth_solar.split(" ")[1]?.split(":")[0] ?? "0"),
+          minute: parseInt(caseData!.birth_solar.split(" ")[1]?.split(":")[1] ?? "0"),
+          gender: caseData!.gender,
+          birthPlace: caseData!.birth_place,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setVerifyResult(data.verification);
+        setAiChartResult(data.aiResult);
+        if (data.imageResult) setImageChartResult(data.imageResult);
+      }
+    } catch (e) {
+      console.error("校验失败:", e);
+    } finally {
+      setVerifyLoading(false);
+    }
+  }
+
+  // 图片上传
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setImageChartResult(data.result);
+      }
+    } catch (e) {
+      console.error("图片上传失败:", e);
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  // AI 生成任务
   async function handleAITask(taskType: string) {
     if (!chart) return;
     setAiLoading(true);
@@ -162,14 +241,15 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Tab 切换 */}
       <div className="flex gap-1 mb-6 border-b" style={{ borderColor: "var(--border)" }}>
-        {[
+        {([
           { key: "chart", label: "命盘" },
+          { key: "verify", label: "三盘校验" },
           { key: "analysis", label: "分析" },
           { key: "ai", label: "AI 工具" },
-        ].map(tab => (
+        ] as Array<{ key: TabKey; label: string }>).map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key as typeof activeTab)}
+            onClick={() => setActiveTab(tab.key)}
             className="px-4 py-2 text-sm transition-all border-b-2"
             style={{
               color: activeTab === tab.key ? "var(--accent)" : "var(--text-secondary)",
@@ -195,6 +275,104 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             />
             <ShenShaList shenSha={chart.shenSha} />
           </div>
+        </div>
+      )}
+
+      {/* 三盘校验 Tab */}
+      {activeTab === "verify" && (
+        <div className="space-y-6">
+          {/* 操作区 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="card">
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+                系统盘
+              </h3>
+              {chart ? (
+                <div className="text-sm" style={{ color: "var(--wood)" }}>
+                  {chart.yearPillar.stem}{chart.yearPillar.branch} {chart.monthPillar.stem}{chart.monthPillar.branch} {chart.dayPillar.stem}{chart.dayPillar.branch} {chart.hourPillar.stem}{chart.hourPillar.branch}
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>尚未排盘</p>
+              )}
+            </div>
+
+            <div className="card">
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+                AI 自排
+              </h3>
+              {aiChartResult ? (
+                <div>
+                  <div className="text-sm" style={{ color: "var(--water)" }}>
+                    {aiChartResult.pillars.year} {aiChartResult.pillars.month} {aiChartResult.pillars.day} {aiChartResult.pillars.hour}
+                  </div>
+                  {aiChartResult.uncertainties.length > 0 && (
+                    <div className="text-xs mt-2" style={{ color: "var(--earth)" }}>
+                      不确定：{aiChartResult.uncertainties.join("；")}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>点击下方按钮生成</p>
+              )}
+            </div>
+
+            <div className="card">
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+                图片识别
+              </h3>
+              {imageChartResult ? (
+                <div>
+                  <div className="text-sm" style={{ color: "var(--gold)" }}>
+                    {imageChartResult.pillars.year} {imageChartResult.pillars.month} {imageChartResult.pillars.day} {imageChartResult.pillars.hour}
+                  </div>
+                  {imageChartResult.uncertainties.length > 0 && (
+                    <div className="text-xs mt-2" style={{ color: "var(--earth)" }}>
+                      不确定：{imageChartResult.uncertainties.join("；")}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>上传排盘截图</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={imageUploading}
+                    className="btn-secondary text-xs !py-1 !px-3"
+                  >
+                    {imageUploading ? "识别中..." : "上传图片"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 校验按钮 */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleVerify}
+              disabled={verifyLoading || !chart}
+              className="btn-primary"
+            >
+              {verifyLoading ? "校验中..." : "执行三盘校验"}
+            </button>
+            <button
+              onClick={() => { handleVerify(); }}
+              disabled={verifyLoading || !chart}
+              className="btn-gold"
+            >
+              AI 自排 + 校验
+            </button>
+          </div>
+
+          {/* 校验结果 */}
+          {verifyResult && <VerificationTable result={verifyResult} />}
         </div>
       )}
 
