@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface StyleGuide {
   id: string;
@@ -101,7 +102,7 @@ export default function StylePage() {
     <div className="max-w-5xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl" style={{ color: "var(--text-primary)" }}>风格库</h1>
-        <a href="/" className="text-sm" style={{ color: "var(--text-muted)" }}>返回列表</a>
+        <Link href="/" className="text-sm" style={{ color: "var(--text-muted)" }}>返回列表</Link>
       </div>
 
       {/* Tab */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface Settings {
   aiProvider: "claude" | "deepseek" | "auto";
@@ -163,9 +164,9 @@ export default function SettingsPage() {
           <button onClick={handleSave} className="btn-primary flex-1">
             {saved ? "已保存" : "保存设置"}
           </button>
-          <a href="/" className="btn-secondary text-center">
+          <Link href="/" className="btn-secondary text-center">
             返回
-          </a>
+          </Link>
         </div>
       </div>
     </div>

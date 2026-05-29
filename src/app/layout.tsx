@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,7 +32,7 @@ export default function RootLayout({
           >
             <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <a href="/" className="flex items-center gap-2">
+                <Link href="/" className="flex items-center gap-2">
                   <span
                     className="text-xl font-semibold tracking-wider"
                     style={{ color: "var(--accent)" }}
@@ -45,36 +46,36 @@ export default function RootLayout({
                   >
                     AI 命理师副脑
                   </span>
-                </a>
+                </Link>
               </div>
               <nav className="flex items-center gap-6">
-                <a
+                <Link
                   href="/"
                   className="text-sm hover:opacity-80 transition-opacity"
                   style={{ color: "var(--text-secondary)" }}
                 >
                   个案列表
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/style"
                   className="text-sm hover:opacity-80 transition-opacity"
                   style={{ color: "var(--text-secondary)" }}
                 >
                   风格库
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/settings"
                   className="text-sm hover:opacity-80 transition-opacity"
                   style={{ color: "var(--text-secondary)" }}
                 >
                   设置
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/cases/new"
                   className="btn-primary text-sm !py-1.5 !px-4"
                 >
                   新建个案
-                </a>
+                </Link>
               </nav>
             </div>
           </header>

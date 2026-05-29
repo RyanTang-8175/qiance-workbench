@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use, useRef, useCallback } from "react";
+import Link from "next/link";
 import BaziChart from "@/components/chart/BaziChart";
 import LuckCycles from "@/components/chart/LuckCycles";
 import ShenShaList from "@/components/chart/ShenSha";
@@ -39,12 +40,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [tokenUsage, setTokenUsage] = useState<{ input: number; output: number; cost: string } | null>(null);
 
-  // AI 相关状态
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
   const [aiTask, setAiTask] = useState<string | null>(null);
 
-  // 三盘校验相关状态
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
   const [aiChartResult, setAiChartResult] = useState<AISelfChartResult | null>(null);
@@ -52,11 +51,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [imageUploading, setImageUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadCase();
-  }, [id]);
-
-  async function loadCase() {
+  const loadCase = useCallback(async () => {
     try {
       const res = await fetch(`/api/cases/${id}`);
       if (res.ok) {
@@ -71,15 +66,16 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
-  // 三盘校验
+  useEffect(() => {
+    loadCase();
+  }, [loadCase]);
+
   async function handleVerify() {
     if (!chart) return;
     setVerifyLoading(true);
     setVerifyResult(null);
-    setAiChartResult(null);
-
     try {
       const res = await fetch("/api/verify", {
         method: "POST",
@@ -94,7 +90,6 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           birthPlace: caseData!.birth_place,
         }),
       });
-
       if (res.ok) {
         const data = await res.json();
         setVerifyResult(data.verification);
@@ -108,21 +103,14 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  // 图片上传
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setImageUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
       if (res.ok) {
         const data = await res.json();
         setImageChartResult(data.result);
@@ -135,7 +123,6 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  // AI 生成任务
   async function handleAITask(taskType: string) {
     if (!chart) return;
     setAiLoading(true);
@@ -144,23 +131,15 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     setTokenUsage(null);
     const startTime = Date.now();
     let fullText = "";
-
     try {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskType,
-          chartData: chart,
-          analysis: caseData?.internal_analysis,
-        }),
+        body: JSON.stringify({ taskType, chartData: chart, analysis: caseData?.internal_analysis }),
       });
-
       if (!res.ok) throw new Error("AI 调用失败");
-
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
-
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
@@ -172,10 +151,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             if (data === "[DONE]") break;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.chunk) {
-                fullText += parsed.chunk;
-                setAiResult(fullText);
-              }
+              if (parsed.chunk) { fullText += parsed.chunk; setAiResult(fullText); }
             } catch { /* skip */ }
           }
         }
@@ -186,16 +162,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     } finally {
       setAiLoading(false);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      // 估算 token（中文约 1.5 token/字）
       const outputTokens = Math.round(fullText.length * 1.5);
       const inputTokens = Math.round(JSON.stringify(chart).length * 0.5);
-      // DeepSeek 约 $0.14/M input, $0.28/M output; Claude Sonnet 约 $3/M input, $15/M output
       const costEstimate = (inputTokens * 0.14 + outputTokens * 0.28) / 1_000_000;
-      setTokenUsage({
-        input: inputTokens,
-        output: outputTokens,
-        cost: `~$${costEstimate.toFixed(4)} · ${elapsed}s`,
-      });
+      setTokenUsage({ input: inputTokens, output: outputTokens, cost: `~$${costEstimate.toFixed(4)} · ${elapsed}s` });
     }
   }
 
@@ -211,67 +181,36 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="max-w-7xl mx-auto px-6 py-20 text-center">
         <p style={{ color: "var(--text-muted)" }}>个案不存在</p>
-        <a href="/" className="btn-secondary mt-4 inline-block">返回列表</a>
+        <Link href="/" className="btn-secondary mt-4 inline-block">返回列表</Link>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6">
-      {/* 头部信息 */}
+      {/* 头部 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <a href="/" className="text-sm" style={{ color: "var(--text-muted)" }}>
-            &larr; 返回
-          </a>
-          <h1 className="text-xl" style={{ color: "var(--text-primary)" }}>
-            {caseData.alias}
-          </h1>
+          <Link href="/" className="text-sm" style={{ color: "var(--text-muted)" }}>&larr; 返回</Link>
+          <h1 className="text-xl" style={{ color: "var(--text-primary)" }}>{caseData.alias}</h1>
           <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {caseData.birth_solar}
-            {caseData.birth_place ? ` · ${caseData.birth_place}` : ""}
+            {caseData.birth_solar}{caseData.birth_place ? ` · ${caseData.birth_place}` : ""}
           </span>
           {caseData.question_type && (
-            <span
-              className="text-xs px-2 py-0.5 rounded"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                color: "var(--text-secondary)",
-                border: "1px solid var(--border)",
-              }}
-            >
+            <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
               {caseData.question_type}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setLayout(layout === "traditional" ? "modern" : "traditional")}
-            className="btn-secondary text-xs !py-1 !px-3"
-          >
-            {layout === "traditional" ? "现代布局" : "传统布局"}
-          </button>
-        </div>
+        <button onClick={() => setLayout(layout === "traditional" ? "modern" : "traditional")} className="btn-secondary text-xs !py-1 !px-3">
+          {layout === "traditional" ? "现代布局" : "传统布局"}
+        </button>
       </div>
 
-      {/* Tab 切换 */}
+      {/* Tab */}
       <div className="flex gap-1 mb-6 border-b" style={{ borderColor: "var(--border)" }}>
-        {([
-          { key: "chart", label: "命盘" },
-          { key: "verify", label: "三盘校验" },
-          { key: "analysis", label: "分析" },
-          { key: "feedback", label: "断前事反馈" },
-          { key: "ai", label: "AI 工具" },
-        ] as Array<{ key: TabKey; label: string }>).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className="px-4 py-2 text-sm transition-all border-b-2"
-            style={{
-              color: activeTab === tab.key ? "var(--accent)" : "var(--text-secondary)",
-              borderColor: activeTab === tab.key ? "var(--accent)" : "transparent",
-            }}
-          >
+        {([{ key: "chart", label: "命盘" }, { key: "verify", label: "三盘校验" }, { key: "analysis", label: "分析" }, { key: "feedback", label: "断前事反馈" }, { key: "ai", label: "AI 工具" }] as Array<{ key: TabKey; label: string }>).map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className="px-4 py-2 text-sm transition-all border-b-2" style={{ color: activeTab === tab.key ? "var(--accent)" : "var(--text-secondary)", borderColor: activeTab === tab.key ? "var(--accent)" : "transparent" }}>
             {tab.label}
           </button>
         ))}
@@ -285,10 +224,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             <LuckCycles cycles={chart.luckCycles} dayStem={chart.dayMaster} />
           </div>
           <div className="space-y-4">
-            <BranchRelations
-              relations={chart.branchRelations}
-              stemRelations={chart.stemRelations}
-            />
+            <BranchRelations relations={chart.branchRelations} stemRelations={chart.stemRelations} />
             <ShenShaList shenSha={chart.shenSha} />
           </div>
         </div>
@@ -297,97 +233,23 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       {/* 三盘校验 Tab */}
       {activeTab === "verify" && (
         <div className="space-y-6">
-          {/* 操作区 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="card">
-              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-                系统盘
-              </h3>
-              {chart ? (
-                <div className="text-sm" style={{ color: "var(--wood)" }}>
-                  {chart.yearPillar.stem}{chart.yearPillar.branch} {chart.monthPillar.stem}{chart.monthPillar.branch} {chart.dayPillar.stem}{chart.dayPillar.branch} {chart.hourPillar.stem}{chart.hourPillar.branch}
-                </div>
-              ) : (
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>尚未排盘</p>
-              )}
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>系统盘</h3>
+              {chart ? <div className="text-sm" style={{ color: "var(--wood)" }}>{chart.yearPillar.stem}{chart.yearPillar.branch} {chart.monthPillar.stem}{chart.monthPillar.branch} {chart.dayPillar.stem}{chart.dayPillar.branch} {chart.hourPillar.stem}{chart.hourPillar.branch}</div> : <p className="text-sm" style={{ color: "var(--text-muted)" }}>尚未排盘</p>}
             </div>
-
             <div className="card">
-              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-                AI 自排
-              </h3>
-              {aiChartResult ? (
-                <div>
-                  <div className="text-sm" style={{ color: "var(--water)" }}>
-                    {aiChartResult.pillars.year} {aiChartResult.pillars.month} {aiChartResult.pillars.day} {aiChartResult.pillars.hour}
-                  </div>
-                  {aiChartResult.uncertainties.length > 0 && (
-                    <div className="text-xs mt-2" style={{ color: "var(--earth)" }}>
-                      不确定：{aiChartResult.uncertainties.join("；")}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>点击下方按钮生成</p>
-              )}
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>AI 自排</h3>
+              {aiChartResult ? <div><div className="text-sm" style={{ color: "var(--water)" }}>{aiChartResult.pillars.year} {aiChartResult.pillars.month} {aiChartResult.pillars.day} {aiChartResult.pillars.hour}</div>{aiChartResult.uncertainties.length > 0 && <div className="text-xs mt-2" style={{ color: "var(--earth)" }}>不确定：{aiChartResult.uncertainties.join("；")}</div>}</div> : <p className="text-sm" style={{ color: "var(--text-muted)" }}>点击下方按钮生成</p>}
             </div>
-
             <div className="card">
-              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-                图片识别
-              </h3>
-              {imageChartResult ? (
-                <div>
-                  <div className="text-sm" style={{ color: "var(--gold)" }}>
-                    {imageChartResult.pillars.year} {imageChartResult.pillars.month} {imageChartResult.pillars.day} {imageChartResult.pillars.hour}
-                  </div>
-                  {imageChartResult.uncertainties.length > 0 && (
-                    <div className="text-xs mt-2" style={{ color: "var(--earth)" }}>
-                      不确定：{imageChartResult.uncertainties.join("；")}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>上传排盘截图</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={imageUploading}
-                    className="btn-secondary text-xs !py-1 !px-3"
-                  >
-                    {imageUploading ? "识别中..." : "上传图片"}
-                  </button>
-                </div>
-              )}
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>图片识别</h3>
+              {imageChartResult ? <div><div className="text-sm" style={{ color: "var(--gold)" }}>{imageChartResult.pillars.year} {imageChartResult.pillars.month} {imageChartResult.pillars.day} {imageChartResult.pillars.hour}</div>{imageChartResult.uncertainties.length > 0 && <div className="text-xs mt-2" style={{ color: "var(--earth)" }}>不确定：{imageChartResult.uncertainties.join("；")}</div>}</div> : <div><p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>上传排盘截图</p><input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" /><button onClick={() => fileInputRef.current?.click()} disabled={imageUploading} className="btn-secondary text-xs !py-1 !px-3">{imageUploading ? "识别中..." : "上传图片"}</button></div>}
             </div>
           </div>
-
-          {/* 校验按钮 */}
           <div className="flex gap-3">
-            <button
-              onClick={handleVerify}
-              disabled={verifyLoading || !chart}
-              className="btn-primary"
-            >
-              {verifyLoading ? "校验中..." : "执行三盘校验"}
-            </button>
-            <button
-              onClick={() => { handleVerify(); }}
-              disabled={verifyLoading || !chart}
-              className="btn-gold"
-            >
-              AI 自排 + 校验
-            </button>
+            <button onClick={handleVerify} disabled={verifyLoading || !chart} className="btn-primary">{verifyLoading ? "校验中..." : "执行三盘校验"}</button>
           </div>
-
-          {/* 校验结果 */}
           {verifyResult && <VerificationTable result={verifyResult} />}
         </div>
       )}
@@ -396,32 +258,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       {activeTab === "analysis" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="card">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-              内部分析
-            </h3>
-            {caseData.internal_analysis ? (
-              <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
-                {caseData.internal_analysis}
-              </div>
-            ) : (
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                尚未生成。前往"AI 工具"标签页生成内部分析。
-              </p>
-            )}
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>内部分析</h3>
+            {caseData.internal_analysis ? <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>{caseData.internal_analysis}</div> : <p className="text-sm" style={{ color: "var(--text-muted)" }}>尚未生成。前往&quot;AI 工具&quot;标签页生成内部分析。</p>}
           </div>
           <div className="card">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-              最终判断
-            </h3>
-            {caseData.your_judgment ? (
-              <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
-                {caseData.your_judgment}
-              </div>
-            ) : (
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                尚未记录。
-              </p>
-            )}
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>最终判断</h3>
+            {caseData.your_judgment ? <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>{caseData.your_judgment}</div> : <p className="text-sm" style={{ color: "var(--text-muted)" }}>尚未记录。</p>}
           </div>
         </div>
       )}
@@ -430,24 +272,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       {activeTab === "feedback" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-              断前事反馈记录
-            </h3>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>断前事反馈记录</h3>
             <FeedbackPanel caseId={id} />
           </div>
           <div className="card">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-              断前事候选
-            </h3>
-            {aiResult && aiTask === "prevalidation" ? (
-              <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
-                {aiResult}
-              </div>
-            ) : (
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                前往"AI 工具"生成断前事候选
-              </p>
-            )}
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>断前事候选</h3>
+            {aiResult && aiTask === "prevalidation" ? <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>{aiResult}</div> : <p className="text-sm" style={{ color: "var(--text-muted)" }}>前往&quot;AI 工具&quot;生成断前事候选</p>}
           </div>
         </div>
       )}
@@ -456,106 +286,34 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       {activeTab === "ai" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-              AI 生成工具
-            </h3>
-            {[
-              { key: "internal_analysis", label: "生成内部分析", desc: "分析命局核心矛盾、喜忌、格局" },
-              { key: "prevalidation", label: "生成断前事", desc: "3 条验盘断语 + 补问路径" },
-              { key: "wechat_reply", label: "生成微信话术", desc: "短/中/深三档话术" },
-              { key: "long_report", label: "生成长文报告", desc: "完整命理分析报告" },
-            ].map(task => (
-              <button
-                key={task.key}
-                onClick={() => handleAITask(task.key)}
-                disabled={aiLoading}
-                className="w-full text-left card hover:border-[var(--accent)] transition-colors"
-                style={{
-                  opacity: aiLoading && aiTask !== task.key ? 0.5 : 1,
-                }}
-              >
-                <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {task.label}
-                </div>
-                <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  {task.desc}
-                </div>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>AI 生成工具</h3>
+            {[{ key: "internal_analysis", label: "生成内部分析", desc: "分析命局核心矛盾、喜忌、格局" }, { key: "prevalidation", label: "生成断前事", desc: "3 条验盘断语 + 补问路径" }, { key: "wechat_reply", label: "生成微信话术", desc: "短/中/深三档话术" }, { key: "long_report", label: "生成长文报告", desc: "完整命理分析报告" }].map(task => (
+              <button key={task.key} onClick={() => handleAITask(task.key)} disabled={aiLoading} className="w-full text-left card hover:border-[var(--accent)] transition-colors" style={{ opacity: aiLoading && aiTask !== task.key ? 0.5 : 1 }}>
+                <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{task.label}</div>
+                <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{task.desc}</div>
               </button>
             ))}
           </div>
-
           <div className="lg:col-span-2 space-y-4">
             <div className="card">
               <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-                {aiTask === "internal_analysis" && "内部分析"}
-                {aiTask === "prevalidation" && "断前事候选"}
-                {aiTask === "wechat_reply" && "微信话术"}
-                {aiTask === "long_report" && "长文报告"}
-                {!aiTask && "AI 生成结果"}
+                {aiTask === "internal_analysis" && "内部分析"}{aiTask === "prevalidation" && "断前事候选"}{aiTask === "wechat_reply" && "微信话术"}{aiTask === "long_report" && "长文报告"}{!aiTask && "AI 生成结果"}
               </h3>
-              {aiLoading && !aiResult && (
-                <div className="animate-pulse-slow" style={{ color: "var(--text-muted)" }}>
-                  正在生成...
-                </div>
-              )}
+              {aiLoading && !aiResult && <div className="animate-pulse-slow" style={{ color: "var(--text-muted)" }}>正在生成...</div>}
               {tokenUsage && (
                 <div className="flex items-center gap-4 text-xs mt-2 p-2 rounded" style={{ backgroundColor: "var(--bg-secondary)" }}>
-                  <span style={{ color: "var(--text-muted)" }}>
-                    Input: ~{tokenUsage.input.toLocaleString()} tokens
-                  </span>
-                  <span style={{ color: "var(--text-muted)" }}>
-                    Output: ~{tokenUsage.output.toLocaleString()} tokens
-                  </span>
-                  <span style={{ color: "var(--gold)" }}>
-                    {tokenUsage.cost}
-                  </span>
+                  <span style={{ color: "var(--text-muted)" }}>Input: ~{tokenUsage.input.toLocaleString()} tokens</span>
+                  <span style={{ color: "var(--text-muted)" }}>Output: ~{tokenUsage.output.toLocaleString()} tokens</span>
+                  <span style={{ color: "var(--gold)" }}>{tokenUsage.cost}</span>
                 </div>
               )}
-              {aiResult && (
-                <div
-                  className="text-sm whitespace-pre-wrap leading-relaxed"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  {aiResult}
-                </div>
-              )}
-              {!aiLoading && !aiResult && (
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  选择左侧工具开始生成
-                </p>
-              )}
+              {aiResult && <div className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "var(--text-secondary)" }}>{aiResult}</div>}
+              {!aiLoading && !aiResult && <p className="text-sm" style={{ color: "var(--text-muted)" }}>选择左侧工具开始生成</p>}
             </div>
-
-            {/* 保存到产物 */}
             {aiResult && !aiLoading && (
               <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    await fetch("/api/artifacts", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        caseId: id,
-                        type: aiTask,
-                        content: aiResult,
-                        model: "claude",
-                      }),
-                    });
-                    alert("已保存到个案记录");
-                  }}
-                  className="btn-primary text-xs"
-                >
-                  保存到个案
-                </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(aiResult);
-                    alert("已复制到剪贴板");
-                  }}
-                  className="btn-gold text-xs"
-                >
-                  复制到微信
-                </button>
+                <button onClick={async () => { await fetch("/api/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ caseId: id, type: aiTask, content: aiResult, model: "claude" }) }); alert("已保存到个案记录"); }} className="btn-primary text-xs">保存到个案</button>
+                <button onClick={() => { navigator.clipboard.writeText(aiResult); alert("已复制到剪贴板"); }} className="btn-gold text-xs">复制到微信</button>
               </div>
             )}
           </div>

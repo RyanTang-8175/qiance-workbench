@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { LOCATION_DB, getProvinces, getCities, getDistricts, searchLocations } from "@/lib/bazi/locations";
 
 export default function NewCasePage() {
@@ -383,7 +384,7 @@ export default function NewCasePage() {
           <button type="submit" className="btn-primary flex-1" disabled={loading}>
             {loading ? "处理中..." : "创建个案并排盘"}
           </button>
-          <a href="/" className="btn-secondary text-center">取消</a>
+          <Link href="/" className="btn-secondary text-center">取消</Link>
         </div>
       </form>
     </div>

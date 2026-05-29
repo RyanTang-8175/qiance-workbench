@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface Case {
   id: string;
@@ -61,9 +62,9 @@ export default function HomePage() {
             共 {cases.length} 个个案
           </p>
         </div>
-        <a href="/cases/new" className="btn-primary">
+        <Link href="/cases/new" className="btn-primary">
           + 新建个案
-        </a>
+        </Link>
       </div>
 
       {/* 筛选标签 */}
@@ -116,7 +117,7 @@ export default function HomePage() {
       ) : (
         <div className="grid gap-4">
           {filteredCases.map((c, i) => (
-            <a
+            <Link
               key={c.id}
               href={`/cases/${c.id}`}
               className="card animate-fadeIn block hover:translate-y-[-1px] transition-transform"
@@ -160,7 +161,7 @@ export default function HomePage() {
                   </span>
                 </div>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       )}
