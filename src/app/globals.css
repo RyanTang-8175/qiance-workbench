@@ -195,3 +195,99 @@ h1, h2, h3, h4, h5, h6 {
   50% { opacity: 0.5; }
 }
 .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
+
+/* ========== iOS 安全区 ========== */
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-left { padding-left: env(safe-area-inset-left); }
+.safe-right { padding-right: env(safe-area-inset-right); }
+
+/* ========== 触摸优化 ========== */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+body {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+}
+
+/* ========== 按钮触摸友好 ========== */
+.btn-primary, .btn-secondary, .btn-gold {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* ========== 表格横向滚动 ========== */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -1rem;
+  padding: 0 1rem;
+}
+
+/* ========== Toast 动画 ========== */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-16px) scale(0.95); }
+}
+.toast-enter { animation: toast-in 0.25s ease-out; }
+.toast-exit { animation: toast-out 0.2s ease-in; }
+
+/* ========== Tab 横向滚动 ========== */
+.tabs-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tabs-scroll::-webkit-scrollbar { display: none; }
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 639px) {
+  .card { padding: 1rem; }
+
+  .chart-table th,
+  .chart-table td {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .input {
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+    padding: 0.6rem 0.75rem;
+  }
+
+  .btn-primary, .btn-secondary, .btn-gold {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  /* 筛选标签水平滚动 */
+  .filter-scroll {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .filter-scroll::-webkit-scrollbar { display: none; }
+  .filter-scroll > button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}

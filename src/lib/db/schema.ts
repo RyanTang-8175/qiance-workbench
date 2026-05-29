@@ -2,8 +2,17 @@
 // 后续可迁移到 PostgreSQL + pgvector
 
 export const CREATE_TABLES_SQL = `
+-- 用户表
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  phone TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- 个案表
 CREATE TABLE IF NOT EXISTS cases (
+  user_id TEXT,
   id TEXT PRIMARY KEY,
   alias TEXT NOT NULL,
   gender TEXT NOT NULL DEFAULT 'unknown' CHECK(gender IN ('male', 'female', 'unknown')),
@@ -107,6 +116,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
 );
 
 -- 索引
+CREATE INDEX IF NOT EXISTS idx_cases_user ON cases(user_id);
 CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
 CREATE INDEX IF NOT EXISTS idx_cases_created ON cases(created_at);
 CREATE INDEX IF NOT EXISTS idx_charts_case ON charts(case_id);
