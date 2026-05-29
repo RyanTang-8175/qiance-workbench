@@ -6,6 +6,7 @@ import LuckCycles from "@/components/chart/LuckCycles";
 import ShenShaList from "@/components/chart/ShenSha";
 import BranchRelations from "@/components/chart/BranchRelations";
 import VerificationTable from "@/components/chart/VerificationTable";
+import FeedbackPanel from "@/components/case/FeedbackPanel";
 import type { ChartResult } from "@/lib/bazi/chart";
 import type { VerificationResult } from "@/lib/bazi/verification";
 import type { AISelfChartResult } from "@/lib/ai/chart-ai";
@@ -27,7 +28,7 @@ interface CaseData {
   created_at: string;
 }
 
-type TabKey = "chart" | "verify" | "analysis" | "ai";
+type TabKey = "chart" | "verify" | "analysis" | "feedback" | "ai";
 
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -245,6 +246,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           { key: "chart", label: "命盘" },
           { key: "verify", label: "三盘校验" },
           { key: "analysis", label: "分析" },
+          { key: "feedback", label: "断前事反馈" },
           { key: "ai", label: "AI 工具" },
         ] as Array<{ key: TabKey; label: string }>).map(tab => (
           <button
@@ -410,6 +412,32 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
+      {/* 断前事反馈 Tab */}
+      {activeTab === "feedback" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+              断前事反馈记录
+            </h3>
+            <FeedbackPanel caseId={id} />
+          </div>
+          <div className="card">
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+              断前事候选
+            </h3>
+            {aiResult && aiTask === "prevalidation" ? (
+              <div className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
+                {aiResult}
+              </div>
+            ) : (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                前往"AI 工具"生成断前事候选
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* AI 工具 Tab */}
       {activeTab === "ai" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -442,31 +470,66 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             ))}
           </div>
 
-          <div className="lg:col-span-2 card min-h-[400px]">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-              {aiTask === "internal_analysis" && "内部分析"}
-              {aiTask === "prevalidation" && "断前事候选"}
-              {aiTask === "wechat_reply" && "微信话术"}
-              {aiTask === "long_report" && "长文报告"}
-              {!aiTask && "AI 生成结果"}
-            </h3>
-            {aiLoading && !aiResult && (
-              <div className="animate-pulse-slow" style={{ color: "var(--text-muted)" }}>
-                正在生成...
+          <div className="lg:col-span-2 space-y-4">
+            <div className="card">
+              <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+                {aiTask === "internal_analysis" && "内部分析"}
+                {aiTask === "prevalidation" && "断前事候选"}
+                {aiTask === "wechat_reply" && "微信话术"}
+                {aiTask === "long_report" && "长文报告"}
+                {!aiTask && "AI 生成结果"}
+              </h3>
+              {aiLoading && !aiResult && (
+                <div className="animate-pulse-slow" style={{ color: "var(--text-muted)" }}>
+                  正在生成...
+                </div>
+              )}
+              {aiResult && (
+                <div
+                  className="text-sm whitespace-pre-wrap leading-relaxed"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {aiResult}
+                </div>
+              )}
+              {!aiLoading && !aiResult && (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  选择左侧工具开始生成
+                </p>
+              )}
+            </div>
+
+            {/* 保存到产物 */}
+            {aiResult && !aiLoading && (
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    await fetch("/api/artifacts", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        caseId: id,
+                        type: aiTask,
+                        content: aiResult,
+                        model: "claude",
+                      }),
+                    });
+                    alert("已保存到个案记录");
+                  }}
+                  className="btn-primary text-xs"
+                >
+                  保存到个案
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(aiResult);
+                    alert("已复制到剪贴板");
+                  }}
+                  className="btn-gold text-xs"
+                >
+                  复制到微信
+                </button>
               </div>
-            )}
-            {aiResult && (
-              <div
-                className="text-sm whitespace-pre-wrap leading-relaxed"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {aiResult}
-              </div>
-            )}
-            {!aiLoading && !aiResult && (
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                选择左侧工具开始生成
-              </p>
             )}
           </div>
         </div>

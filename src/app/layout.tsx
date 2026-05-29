@@ -56,6 +56,13 @@ export default function RootLayout({
                   个案列表
                 </a>
                 <a
+                  href="/style"
+                  className="text-sm hover:opacity-80 transition-opacity"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  风格库
+                </a>
+                <a
                   href="/cases/new"
                   className="btn-primary text-sm !py-1.5 !px-4"
                 >
