@@ -32,8 +32,9 @@ export default function SettingsPage() {
       setSettings(prev => ({
         ...prev,
         aiProvider: data.aiProvider || "auto",
-        claudeApiKey: data.claudeApiKey || "",
-        deepseekApiKey: data.deepseekApiKey || "",
+        // 不预填 Key，留空让用户输入新 Key
+        claudeApiKey: "",
+        deepseekApiKey: "",
         defaultGender: data.defaultGender || "male",
         defaultTrueSolarTime: data.defaultTrueSolarTime ?? false,
       }));
@@ -43,10 +44,19 @@ export default function SettingsPage() {
 
   async function handleSave() {
     try {
+      // 只发送用户实际填写的 Key，空的不发送（保留旧值）
+      const payload: Record<string, unknown> = {
+        aiProvider: settings.aiProvider,
+        defaultGender: settings.defaultGender,
+        defaultTrueSolarTime: settings.defaultTrueSolarTime,
+      };
+      if (settings.claudeApiKey) payload.claudeApiKey = settings.claudeApiKey;
+      if (settings.deepseekApiKey) payload.deepseekApiKey = settings.deepseekApiKey;
+
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -121,13 +131,17 @@ export default function SettingsPage() {
           )}
           <div className="space-y-3">
             <div>
-              <label className="block text-sm mb-1" style={{ color: "var(--text-secondary)" }}>Claude API Key</label>
-              <input type="password" className="input" placeholder="sk-ant-..." value={settings.claudeApiKey} onChange={e => updateSetting("claudeApiKey", e.target.value)} />
+              <label className="block text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
+                Claude API Key {keyStatus?.hasClaudeKey && <span style={{ color: "var(--wood)" }}>✓ 已配置</span>}
+              </label>
+              <input type="password" className="input" placeholder={keyStatus?.hasClaudeKey ? "已配置，如需更换请输入新 Key" : "sk-ant-..."} value={settings.claudeApiKey} onChange={e => updateSetting("claudeApiKey", e.target.value)} />
               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>深度分析、OCR。从 console.anthropic.com 获取</p>
             </div>
             <div>
-              <label className="block text-sm mb-1" style={{ color: "var(--text-secondary)" }}>DeepSeek API Key</label>
-              <input type="password" className="input" placeholder="sk-..." value={settings.deepseekApiKey} onChange={e => updateSetting("deepseekApiKey", e.target.value)} />
+              <label className="block text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
+                DeepSeek API Key {keyStatus?.hasDeepseekKey && <span style={{ color: "var(--wood)" }}>✓ 已配置</span>}
+              </label>
+              <input type="password" className="input" placeholder={keyStatus?.hasDeepseekKey ? "已配置，如需更换请输入新 Key" : "sk-..."} value={settings.deepseekApiKey} onChange={e => updateSetting("deepseekApiKey", e.target.value)} />
               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>话术生成、简单任务。从 platform.deepseek.com 获取</p>
             </div>
             <button onClick={handleTestConnection} disabled={testing} className="btn-secondary text-sm w-full">
