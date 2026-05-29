@@ -82,9 +82,13 @@ export default function NewCasePage() {
         }),
       });
 
+      if (!caseRes.ok) {
+        const errBody = await caseRes.json().catch(() => null);
+        throw new Error(errBody?.error || "创建个案失败");
+      }
       const newCase = await caseRes.json();
 
-      // 2. 排盘
+      // 2. 排盘（或保存自提供数据）
       if (form.hourKnown && !form.provideOwnChart) {
         setProgress("正在排盘（八字+紫微）...");
         const chartRes = await fetch("/api/chart", {
@@ -105,8 +109,7 @@ export default function NewCasePage() {
         if (chartRes.ok) {
           const chartData = await chartRes.json();
           setProgress("排盘完成，保存结果...");
-          // 更新个案的排盘数据
-          await fetch(`/api/cases/${newCase.id}`, {
+          const patchRes = await fetch(`/api/cases/${newCase.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -115,7 +118,19 @@ export default function NewCasePage() {
               status: "charted",
             }),
           });
+          if (!patchRes.ok) console.error("保存排盘数据失败");
         }
+      } else if (form.provideOwnChart && form.ownChartData) {
+        // 保存用户自提供的排盘数据
+        setProgress("保存排盘数据...");
+        await fetch(`/api/cases/${newCase.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            internal_analysis: form.ownChartData,
+            status: "charted",
+          }),
+        });
       }
 
       setProgress("完成！");

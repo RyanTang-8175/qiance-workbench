@@ -44,6 +44,24 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [aiResult, setAiResult] = useState("");
   const [aiTask, setAiTask] = useState<string | null>(null);
 
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!caseData) return;
+    if (!confirm(`确定要删除个案"${caseData.alias}"吗？此操作不可撤销。`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/cases/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        window.location.href = "/";
+      }
+    } catch (e) {
+      console.error("删除失败:", e);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
   const [aiChartResult, setAiChartResult] = useState<AISelfChartResult | null>(null);
@@ -73,21 +91,22 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   }, [loadCase]);
 
   async function handleVerify() {
-    if (!chart) return;
+    if (!chart || !caseData) return;
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
+      const datePart = caseData.birth_solar.split(" ")[0];
+      const timePart = caseData.birth_solar.split(" ")[1] ?? "00:00";
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute] = timePart.split(":").map(Number);
+
       const res = await fetch("/api/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          year: new Date(caseData!.birth_solar).getFullYear(),
-          month: new Date(caseData!.birth_solar).getMonth() + 1,
-          day: new Date(caseData!.birth_solar).getDate(),
-          hour: parseInt(caseData!.birth_solar.split(" ")[1]?.split(":")[0] ?? "0"),
-          minute: parseInt(caseData!.birth_solar.split(" ")[1]?.split(":")[1] ?? "0"),
-          gender: caseData!.gender,
-          birthPlace: caseData!.birth_place,
+          year, month, day, hour, minute,
+          gender: caseData.gender,
+          birthPlace: caseData.birth_place,
         }),
       });
       if (res.ok) {
@@ -131,34 +150,57 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     setTokenUsage(null);
     const startTime = Date.now();
     let fullText = "";
+    let errorMsg = "";
     try {
+      // 获取风格指南
+      let styleGuide = "";
+      try {
+        const styleRes = await fetch("/api/style");
+        if (styleRes.ok) {
+          const styleData = await styleRes.json();
+          const activeGuide = styleData.guides?.find((g: { is_active: number }) => g.is_active);
+          if (activeGuide?.guide_content) styleGuide = activeGuide.guide_content;
+        }
+      } catch { /* 忽略 */ }
+
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType, chartData: chart, analysis: caseData?.internal_analysis }),
+        body: JSON.stringify({ taskType, chartData: chart, analysis: caseData?.internal_analysis, styleGuide }),
       });
-      if (!res.ok) throw new Error("AI 调用失败");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || `请求失败 (${res.status})`);
+      }
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       if (reader) {
-        while (true) {
+        let streamDone = false;
+        while (!streamDone) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
           for (const line of lines) {
             const data = line.replace("data: ", "").trim();
-            if (data === "[DONE]") break;
+            if (data === "[DONE]") { streamDone = true; break; }
             try {
               const parsed = JSON.parse(data);
+              if (parsed.error) { errorMsg = parsed.error; }
               if (parsed.chunk) { fullText += parsed.chunk; setAiResult(fullText); }
             } catch { /* skip */ }
           }
         }
       }
+      if (errorMsg) {
+        setAiResult(`生成失败：${errorMsg}`);
+      } else if (!fullText) {
+        setAiResult("生成失败：未收到任何输出，请检查 API Key 是否已在设置页面配置");
+      }
     } catch (e) {
-      console.error("AI 生成失败:", e);
-      setAiResult("生成失败，请检查 API Key 配置");
+      const msg = e instanceof Error ? e.message : "未知错误";
+      console.error("AI 生成失败:", msg);
+      setAiResult(`生成失败：${msg}`);
     } finally {
       setAiLoading(false);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -202,9 +244,14 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
         </div>
-        <button onClick={() => setLayout(layout === "traditional" ? "modern" : "traditional")} className="btn-secondary text-xs !py-1 !px-3">
-          {layout === "traditional" ? "现代布局" : "传统布局"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setLayout(layout === "traditional" ? "modern" : "traditional")} className="btn-secondary text-xs !py-1 !px-3">
+            {layout === "traditional" ? "现代布局" : "传统布局"}
+          </button>
+          <button onClick={handleDelete} disabled={deleting} className="text-xs px-3 py-1 rounded transition-colors hover:opacity-80" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "var(--fire)", border: "1px solid rgba(220,38,38,0.2)" }}>
+            {deleting ? "删除中..." : "删除个案"}
+          </button>
+        </div>
       </div>
 
       {/* Tab */}

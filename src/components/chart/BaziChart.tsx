@@ -17,37 +17,6 @@ const ELEMENT_BG: Record<string, string> = {
   金: "element-bg-metal", 水: "element-bg-water",
 };
 
-function PillarCell({ label, stem, branch, tenGod, hiddenStems, naYin }: {
-  label: string; stem: string; branch: string; tenGod: string;
-  hiddenStems: string[]; naYin: string;
-}) {
-  return (
-    <div className="flex flex-col items-center min-w-[100px]">
-      <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>{label}</div>
-      <div
-        className={`text-2xl font-bold mb-1 ${ELEMENT_CLASS[stem[0]] ?? ""}`}
-        style={{ fontFamily: "serif" }}
-      >
-        {stem}
-      </div>
-      <div
-        className={`text-2xl font-bold mb-2 ${ELEMENT_CLASS[branch[0]] ?? ""}`}
-        style={{ fontFamily: "serif" }}
-      >
-        {branch}
-      </div>
-      <div className="divider-zhu !my-1 !w-12" />
-      <div className="text-xs mt-1" style={{ color: "var(--gold)" }}>{tenGod}</div>
-      <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-        藏：{hiddenStems.join(" ")}
-      </div>
-      <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-        {naYin}
-      </div>
-    </div>
-  );
-}
-
 export default function BaziChart({ chart, layout = "traditional" }: BaziChartProps) {
   const pillars = [
     { label: "年柱", ...chart.yearPillar },
@@ -69,10 +38,10 @@ export default function BaziChart({ chart, layout = "traditional" }: BaziChartPr
               <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
                 {p.label}
               </div>
-              <div className={`text-3xl font-bold ${ELEMENT_CLASS[p.stem]}`}>
+              <div className={`text-3xl font-bold ${ELEMENT_CLASS[p.element] ?? ""}`}>
                 {p.stem}
               </div>
-              <div className={`text-3xl font-bold mt-1 ${ELEMENT_CLASS[p.branch]}`}>
+              <div className={`text-3xl font-bold mt-1 ${ELEMENT_CLASS[p.element] ?? ""}`}>
                 {p.branch}
               </div>
               <div className="divider-zhu !my-2" />
@@ -93,7 +62,7 @@ export default function BaziChart({ chart, layout = "traditional" }: BaziChartPr
         <div className="card">
           <div className="flex items-center gap-4">
             <div
-              className={`text-4xl font-bold ${ELEMENT_CLASS[chart.dayMaster]}`}
+              className={`text-4xl font-bold ${ELEMENT_CLASS[chart.dayMasterElement] ?? ""}`}
               style={{ fontFamily: "serif" }}
             >
               {chart.dayMaster}
@@ -135,13 +104,13 @@ export default function BaziChart({ chart, layout = "traditional" }: BaziChartPr
           <tr>
             <th>天干</th>
             {pillars.map((p, i) => (
-              <td key={i} className={ELEMENT_CLASS[p.stem]}>{p.stem}</td>
+              <td key={i} className={ELEMENT_CLASS[p.element] ?? ""}>{p.stem}</td>
             ))}
           </tr>
           <tr>
             <th>地支</th>
             {pillars.map((p, i) => (
-              <td key={i} className={ELEMENT_CLASS[p.branch]}>{p.branch}</td>
+              <td key={i} className={ELEMENT_CLASS[p.element] ?? ""}>{p.branch}</td>
             ))}
           </tr>
           <tr>

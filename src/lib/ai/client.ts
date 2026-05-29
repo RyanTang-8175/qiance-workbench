@@ -1,5 +1,6 @@
 // AI 客户端：Claude + DeepSeek 双切换
 import Anthropic from "@anthropic-ai/sdk";
+import { getConfig } from "@/lib/config";
 
 export type AIProvider = "claude" | "deepseek";
 
@@ -21,17 +22,30 @@ export const MODEL_ROUTER: Record<string, AIConfig> = {
   chart_comparison: { provider: "deepseek", model: "deepseek-chat", maxTokens: 1024 },
 };
 
+function resolveProvider(taskType: string, override?: AIProvider): AIProvider {
+  if (override) return override;
+  const config = getConfig();
+  if (config.aiProvider === "claude") return "claude";
+  if (config.aiProvider === "deepseek") return "deepseek";
+  // auto: 使用路由表
+  return MODEL_ROUTER[taskType]?.provider ?? "deepseek";
+}
+
 // Claude 客户端
 function getClaudeClient(): Anthropic {
-  return new Anthropic({
-    apiKey: process.env.CLAUDE_API_KEY ?? "",
-  });
+  const config = getConfig();
+  const key = config.claudeApiKey;
+  if (!key) throw new Error("Claude API Key 未配置，请在设置页面填写");
+  return new Anthropic({ apiKey: key });
 }
 
 // DeepSeek 客户端（兼容 OpenAI 格式）
 function getDeepSeekClient() {
+  const config = getConfig();
+  const key = config.deepseekApiKey;
+  if (!key) throw new Error("DeepSeek API Key 未配置，请在设置页面填写");
   return {
-    apiKey: process.env.DEEPSEEK_API_KEY ?? "",
+    apiKey: key,
     baseURL: "https://api.deepseek.com/v1",
   };
 }
@@ -57,20 +71,20 @@ export async function callAI(
   messages: AIMessage[],
   options?: { provider?: AIProvider; model?: string }
 ): Promise<AIResponse> {
-  const config = MODEL_ROUTER[taskType] ?? {
-    provider: "claude",
-    model: "claude-sonnet-4-20250514",
+  const routerConfig = MODEL_ROUTER[taskType] ?? {
+    provider: "deepseek" as AIProvider,
+    model: "deepseek-chat",
     maxTokens: 2048,
   };
 
-  const provider = options?.provider ?? config.provider;
-  const model = options?.model ?? config.model;
+  const provider = resolveProvider(taskType, options?.provider);
+  const model = options?.model ?? routerConfig.model;
 
   if (provider === "claude") {
     const client = getClaudeClient();
     const response = await client.messages.create({
       model,
-      max_tokens: config.maxTokens,
+      max_tokens: routerConfig.maxTokens,
       system: systemPrompt,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
     });
@@ -96,7 +110,7 @@ export async function callAI(
       },
       body: JSON.stringify({
         model,
-        max_tokens: config.maxTokens,
+        max_tokens: routerConfig.maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
           ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -125,20 +139,20 @@ export async function callAIStream(
   onChunk: (chunk: string) => void,
   options?: { provider?: AIProvider; model?: string }
 ): Promise<AIResponse> {
-  const config = MODEL_ROUTER[taskType] ?? {
-    provider: "claude",
-    model: "claude-sonnet-4-20250514",
+  const routerConfig = MODEL_ROUTER[taskType] ?? {
+    provider: "deepseek" as AIProvider,
+    model: "deepseek-chat",
     maxTokens: 2048,
   };
 
-  const provider = options?.provider ?? config.provider;
-  const model = options?.model ?? config.model;
+  const provider = resolveProvider(taskType, options?.provider);
+  const model = options?.model ?? routerConfig.model;
 
   if (provider === "claude") {
     const client = getClaudeClient();
     const stream = client.messages.stream({
       model,
-      max_tokens: config.maxTokens,
+      max_tokens: routerConfig.maxTokens,
       system: systemPrompt,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
     });
@@ -172,7 +186,7 @@ export async function callAIStream(
       },
       body: JSON.stringify({
         model,
-        max_tokens: config.maxTokens,
+        max_tokens: routerConfig.maxTokens,
         stream: true,
         messages: [
           { role: "system", content: systemPrompt },

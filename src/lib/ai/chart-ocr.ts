@@ -1,5 +1,6 @@
 // 排盘图 OCR 识别模块：Claude Vision 识别排盘截图
 import Anthropic from "@anthropic-ai/sdk";
+import { getConfig } from "@/lib/config";
 
 export interface ChartOCRResult {
   birthInfo: {
@@ -72,9 +73,10 @@ const OCR_SYSTEM = `你现在只做排盘图识别，不做命理分析。
 如果看不清，请标记在 uncertainties 中，不要猜。只输出 JSON。`;
 
 export async function recognizeChartImage(imageBase64: string, mediaType: string = "image/png"): Promise<ChartOCRResult> {
-  const apiKey = process.env.CLAUDE_API_KEY;
+  const config = getConfig();
+  const apiKey = config.claudeApiKey;
   if (!apiKey) {
-    throw new Error("CLAUDE_API_KEY 未配置");
+    throw new Error("Claude API Key 未配置，请在设置页面填写");
   }
 
   const client = new Anthropic({ apiKey });

@@ -22,20 +22,39 @@ const DEFAULT_SETTINGS: Settings = {
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<{ hasClaudeKey: boolean; hasDeepseekKey: boolean } | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("qiance_settings");
-    if (stored) {
-      try {
-        setSettings(JSON.parse(stored));
-      } catch { /* ignore */ }
-    }
+    // 从后端加载配置
+    fetch("/api/settings").then(r => r.json()).then(data => {
+      setSettings(prev => ({
+        ...prev,
+        aiProvider: data.aiProvider || "auto",
+        claudeApiKey: data.claudeApiKey || "",
+        deepseekApiKey: data.deepseekApiKey || "",
+        defaultGender: data.defaultGender || "male",
+        defaultTrueSolarTime: data.defaultTrueSolarTime ?? false,
+      }));
+      setKeyStatus({ hasClaudeKey: data.hasClaudeKey, hasDeepseekKey: data.hasDeepseekKey });
+    }).catch(() => { /* ignore */ });
   }, []);
 
-  function handleSave() {
-    localStorage.setItem("qiance_settings", JSON.stringify(settings));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setKeyStatus({ hasClaudeKey: data.hasClaudeKey, hasDeepseekKey: data.hasDeepseekKey });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (e) {
+      alert("保存失败");
+    }
   }
 
   function updateSetting<K extends keyof Settings>(key: K, value: Settings[K]) {
@@ -82,6 +101,16 @@ export default function SettingsPage() {
         {/* API Keys */}
         <div className="card">
           <h2 className="text-lg mb-4" style={{ color: "var(--text-primary)" }}>API Keys</h2>
+          {keyStatus && (
+            <div className="flex gap-3 mb-4 text-xs">
+              <span style={{ color: keyStatus.hasClaudeKey ? "var(--wood)" : "var(--fire)" }}>
+                Claude: {keyStatus.hasClaudeKey ? "已配置" : "未配置"}
+              </span>
+              <span style={{ color: keyStatus.hasDeepseekKey ? "var(--wood)" : "var(--fire)" }}>
+                DeepSeek: {keyStatus.hasDeepseekKey ? "已配置" : "未配置"}
+              </span>
+            </div>
+          )}
           <div className="space-y-4">
             <div>
               <label className="block text-sm mb-1" style={{ color: "var(--text-secondary)" }}>

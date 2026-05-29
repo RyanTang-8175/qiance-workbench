@@ -56,12 +56,14 @@ export async function POST(req: NextRequest) {
             },
             provider ? { provider } : undefined
           );
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
         } catch (error) {
+          const msg = error instanceof Error ? error.message : "AI 调用失败";
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ error: "AI 调用失败" })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`)
           );
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
         }
       },

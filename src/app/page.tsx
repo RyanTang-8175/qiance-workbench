@@ -50,6 +50,20 @@ export default function HomePage() {
     ? cases
     : cases.filter(c => c.status === filter);
 
+  async function handleDeleteCase(e: React.MouseEvent, caseId: string, alias: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`确定要删除个案"${alias}"吗？此操作不可撤销。`)) return;
+    try {
+      const res = await fetch(`/api/cases/${caseId}`, { method: "DELETE" });
+      if (res.ok) {
+        setCases(prev => prev.filter(c => c.id !== caseId));
+      }
+    } catch (e) {
+      console.error("删除失败:", e);
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* 页面标题 */}
@@ -159,6 +173,14 @@ export default function HomePage() {
                   <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                     {new Date(c.updated_at).toLocaleDateString("zh-CN")}
                   </span>
+                  <button
+                    onClick={(e) => handleDeleteCase(e, c.id, c.alias)}
+                    className="text-xs px-2 py-0.5 rounded transition-colors hover:opacity-80"
+                    style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "var(--fire)" }}
+                    title="删除个案"
+                  >
+                    删除
+                  </button>
                 </div>
               </div>
             </Link>
