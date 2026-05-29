@@ -29,7 +29,7 @@ export default function BaziChart({ chart, layout = "traditional" }: BaziChartPr
     return (
       <div className="space-y-4">
         {/* 现代卡片布局 */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {pillars.map((p, i) => (
             <div
               key={i}
@@ -84,7 +84,7 @@ export default function BaziChart({ chart, layout = "traditional" }: BaziChartPr
   // 传统格子布局
   return (
     <div className="space-y-4">
-      <table className="chart-table">
+      <div className="table-scroll"><table className="chart-table">
         <thead>
           <tr>
             <th></th>
@@ -126,7 +126,7 @@ export default function BaziChart({ chart, layout = "traditional" }: BaziChartPr
             ))}
           </tr>
         </tbody>
-      </table>
+      </table></div>
 
       {/* 五行统计 */}
       <div className="card">
